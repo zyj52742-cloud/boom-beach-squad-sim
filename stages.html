@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>海岛奇兵 · 多阶段抽卡规划器</title>
+<style>
+  :root{
+    --bg:#0d1420; --panel:#141d2e; --panel2:#1a2740; --line:#2a3a55;
+    --txt:#e6edf7; --dim:#8fa3c0; --accent:#4da3ff; --accent2:#7c5cff;
+    --good:#3ddc97; --warn:#ffb347; --bad:#ff6b6b;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:radial-gradient(1200px 600px at 50% -10%, #1b2b47 0%, var(--bg) 55%);
+    color:var(--txt); font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+    min-height:100vh; padding:26px 16px 44px;}
+  .wrap{max-width:1080px; margin:0 auto;}
+  h1{font-size:23px; font-weight:700;}
+  h1 span{color:var(--accent);}
+  .sub{color:var(--dim); font-size:12.5px; margin-top:8px; line-height:1.8;}
+  .sub b{color:#bcd4f5;}
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-top:20px;}
+  .panel{background:linear-gradient(180deg,var(--panel2),var(--panel)); border:1px solid var(--line);
+         border-radius:14px; padding:16px 18px;}
+  .panel h2{font-size:13px; color:var(--accent); margin-bottom:12px; letter-spacing:.4px;}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:9px;}
+  .row label{font-size:12.5px; color:var(--dim);}
+  input,select{background:#0b1220; border:1px solid var(--line); color:var(--txt); border-radius:7px;
+    padding:6px 9px; font-size:13px; outline:none; font-family:inherit;}
+  input:focus,select:focus{border-color:var(--accent);}
+  input[type=number]{width:80px;}
+  .hint{font-size:11px; color:#6b7f9c; line-height:1.7; margin-top:8px;}
+  button{padding:9px 14px; border:none; border-radius:8px; cursor:pointer; font-family:inherit;
+    background:linear-gradient(90deg,var(--accent2),var(--accent)); color:#fff; font-size:13px; font-weight:700;}
+  button:hover{filter:brightness(1.12);}
+  button.ghost{background:#0b1220; border:1px solid var(--line); color:var(--dim); font-weight:400;}
+  button.ghost:hover{color:var(--txt); border-color:var(--accent);}
+  button:disabled{opacity:.6; cursor:wait;}
+  h3{font-size:14px; margin:22px 0 8px;}
+  h3 small{font-size:11.5px; color:var(--dim); font-weight:400; margin-left:8px;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{padding:7px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle;}
+  th{color:var(--dim); font-weight:600; font-size:11.5px;}
+  td.c{text-align:center;}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-top:16px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:15px;}
+  .card .k{font-size:12px; color:var(--dim);}
+  .card .v2{font-size:25px; font-weight:800; margin-top:7px; font-variant-numeric:tabular-nums;}
+  .card .s{font-size:11px; color:#6b7f9c; margin-top:6px; line-height:1.5;}
+  .good{color:var(--good);} .warn{color:var(--warn);} .bad{color:var(--bad);}
+  .bar{height:8px; background:#0b1220; border-radius:4px; overflow:hidden; margin-top:9px;}
+  .bar i{display:block; height:100%; border-radius:4px; background:linear-gradient(90deg,var(--accent2),var(--accent));}
+  .verdict{margin-top:12px; padding:14px 16px; border-radius:12px; font-size:13px; line-height:1.85;
+    background:rgba(77,163,255,.08); border:1px solid rgba(77,163,255,.28);}
+  .verdict b{color:var(--accent);}
+  .foot{margin-top:24px; font-size:11.5px; color:#6b7f9c; line-height:1.9;
+    border-top:1px solid var(--line); padding-top:14px;}
+  .foot b{color:var(--dim);}
+  .warnbox{margin-top:12px; padding:10px 14px; border-radius:8px; font-size:11.5px; line-height:1.8;
+    background:rgba(255,179,71,.08); border:1px solid rgba(255,179,71,.3); color:#ffd08a;}
+  .stage-row input[type=text]{width:110px;}
+  .stage-row select{max-width:190px;}
+  #result{display:none;}
+  .tag{display:inline-block; font-size:10.5px; padding:2px 7px; border-radius:20px;}
+  .tip{font-size:11px; color:#6b7f9c; margin-top:6px;}
+  .group{margin-top:14px;}
+  .group summary{cursor:pointer; font-size:12.5px; color:var(--accent); padding:8px 12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; list-style:none;}
+  .group summary::-webkit-details-marker{display:none;}
+  .group summary::before{content:"▸ ";}
+  .group[open] summary::before{content:"▾ ";}
+  .group table{font-size:12px; margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>海岛奇兵 · <span>多阶段抽卡规划器</span>
+    <small style="font-size:12px;color:#6b7f9c;font-weight:400;margin-left:8px">v3.4 · 2026-10-23 更新</small></h1>
+  <p class="sub">
+    按时间顺序模拟：到日期有多少抽 → 抽这个目标 → 剩余继续攒 → 下一阶段。
+    每阶段可以指定「首金 50%」或「已垫 1 金（下次 100%）」。<br>
+    基准机制：官方标称期望 <b>90</b> 抽、最坏 <b>160</b> 抽；实际按你设的「单个本体期望」<b>等比缩放</b>（默认 120 = 保守）。命数：<b>1 本体 = 0 命</b>，6 本体 = 满命。
+  </p>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>① 你的资源（按来源拆开）</h2>
+      <div class="row"><label>当前钥匙</label><input id="keys" type="number" value="400" min="0"></div>
+      <div class="row"><label>海岛宝藏（周卡）</label>
+        <span><input id="weekly" type="number" value="20" min="0" style="width:62px"> 抽 /
+        <input id="weeklyDays" type="number" value="6" min="1" style="width:46px"> 天</span></div>
+      <div class="row"><label>队长部署活动</label>
+        <span><input id="monthly" type="number" value="38" min="0" style="width:62px"> 抽/月</span></div>
+      <div class="row"><label>声纳站</label>
+        <span><input id="sonar" type="number" value="0.5" step="0.1" min="0" style="width:62px"> 抽/天
+        <input id="sonarOn" type="checkbox" style="width:auto"></span></div>
+      <div class="row"><label>每日免费一抽</label>
+        <span><input id="freeOn" type="checkbox" style="width:auto"> 计入</span></div>
+      <div class="row"><label><b>折算每日入账</b></label><span class="v" id="dailyCalc">—</span></div>
+      <div class="row"><label>单个本体期望（抽）</label><input id="perUnit" type="number" value="120" min="60" step="5"></div>
+      <p class="hint">官方标称「平均 90 抽/个」，实际体验常更差。默认按 <b>120 抽</b> 保守估算，可自己调（90 = 乐观，120 = 保守，150 = 很保守）。</p>
+    </div>
+    <div class="panel">
+      <h2>② 怎么用</h2>
+      <p class="hint">
+        1. 每行是一期抽卡计划，按日期先后自动排序<br>
+        2. 日期填返场/上线日，格式 <b>2026-11-02</b><br>
+        3. 「池状态」：<b>首金 50%</b> = 这期从零开始；<b>已垫 1 金</b> = 上个金没中，下次必出当期（100%）<br>
+        4. 点「开始模拟」看每阶段能不能达成、抽完还剩多少
+      </p>
+    </div>
+  </div>
+
+  <h3>③ 抽卡计划 <small>按日期顺序执行，前面的剩余抽数会带到后面</small></h3>
+  <table id="planTable">
+    <thead>
+      <tr>
+        <th style="width:36px">#</th>
+        <th style="width:130px">日期</th>
+        <th>目标队长</th>
+        <th style="width:80px">目标命数</th>
+        <th style="width:150px">池状态</th>
+        <th>需要本体</th>
+        <th style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody id="planBody"></tbody>
+  </table>
+  <div style="margin-top:10px">
+    <button class="ghost" id="addStage">+ 添加阶段</button>
+    <button id="go" style="margin-left:10px">开 始 模 拟</button>
+  </div>
+
+  <p class="hint" style="margin-top:12px">
+    精英池抽金时：<b>50%</b> 出本期当期主打，<b>50%</b> 从基础中尉池随机（也就是会「歪」）——
+    <b>霍努 / 朱利叶斯·马斯 / 罗伯托·法尔考 / 纳凡菈女皇 / 40 式末日彩云</b>，各 20%。
+  </p>
+
+  <details class="group">
+    <summary>精英中尉总览（8 个）：已出 6 个 + 即将上线 2 个</summary>
+    <table id="eliteTable"></table>
+  </details>
+  <details class="group">
+    <summary>会「歪」到的队长：基础中尉池（5 个，各 20%）</summary>
+    <table id="midTable"></table>
+  </details>
+  <details class="group">
+    <summary>节日参考（2026~2029 主要节日，填日期时可对照）</summary>
+    <table id="festTable"></table>
+  </details>
+
+  <div id="result">
+    <div class="cards">
+      <div class="card"><div class="k">全流程完成概率</div><div class="v2" id="rAll">—</div>
+        <div class="bar"><i id="rBar" style="width:0"></i></div><div class="s">所有阶段都达成</div></div>
+      <div class="card"><div class="k">最终剩余抽数（中位）</div><div class="v2" id="rLeft">—</div><div class="s">全部完成后的余量</div></div>
+      <div class="card"><div class="k">卡点阶段</div><div class="v2" id="rRisk" style="font-size:18px">—</div><div class="s">达成率最低的一期</div></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+
+    <h3>每阶段明细 <small>届时抽数是确定的；期望/达成率来自蒙特卡洛</small></h3>
+    <table id="stageResult"></table>
+  </div>
+
+  <div class="foot">
+    <b>机制来源：</b>游戏内招募说明（精英招募平均 90 抽获当期、保底 80 抽出一个金）+ 首金 50% / 次金 100% 规则。数据截至 2026-10-23。<br>
+    <b>池状态说明：</b>「已垫 1 金」指你在该池已经抽到过一个金但它不是当期主打，按规则下一个金 100% 是当期；抽中后状态自动重置为首金 50%。<br>
+    <b>边界：</b>只做概率与资源规划，不涉及修改游戏数据或重复领奖。
+  </div>
+  <div class="warnbox">
+    提醒：卡网、断线重连、重复领奖违反用户协议且会触发风控，本工具不涉及也不建议尝试。
+  </div>
+</div>
+
+<script>
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var DAYS_MS = 86400000;
+
+/* ===== 队长库（与 33 号一致，35 个） ===== */
+var LEADERS = [
+  {id:"anna", name:"安娜·施林格尔", rank:"精英中尉", unit:"迫击炮手", cn:"已出", win:"2026-04-29 ~ 05-25"},
+  {id:"linnea", name:"林尼亚·弗里斯可达", rank:"精英中尉", unit:"医师", cn:"已出", win:"2026-05-25 ~ 06-29"},
+  {id:"kai", name:"凯", rank:"精英中尉", unit:"投弹兵", cn:"已出", win:"2026-07-07 ~ 07-27"},
+  {id:"p1001", name:"1001 型百变战车", rank:"精英中尉", unit:"烈焰战车", cn:"已出", win:"日历无记录"},
+  {id:"fasimov", name:"法西莫夫", rank:"精英中尉", unit:"激光突击兵", cn:"已出", win:"2026-08-24 ~ 09-28"},
+  {id:"m404", name:"404 型机甲巨齿鲨", rank:"精英中尉", unit:"机甲", cn:"已出", win:"2026-09-28 起"},
+  {id:"rc22", name:"22 型暗影直升机", rank:"精英中尉", unit:"火箭直升机", cn:"即将上线", win:"2026-10-26 ~ 11-22（推测）"},
+  {id:"nwunu", name:"恩武努（冰妹）", rank:"精英中尉", unit:"极冻先锋", cn:"即将上线", win:"2026-11-02 ~ 12-19（推测）"},
+  {id:"honu", name:"霍努", rank:"中尉", unit:"步兵", cn:"已出", win:"常驻"},
+  {id:"mass", name:"朱利叶斯·马斯", rank:"中尉", unit:"重机枪手", cn:"已出", win:"常驻"},
+  {id:"falcao", name:"罗伯托·法尔考", rank:"中尉", unit:"火箭炮手", cn:"已出", win:"常驻"},
+  {id:"nafanoua", name:"纳凡菈女皇", rank:"中尉", unit:"土著勇士", cn:"已出", win:"常驻"},
+  {id:"tl40", name:"40 式末日彩云", rank:"中尉", unit:"坦克", cn:"已出", win:"常驻"},
+  {id:"amani", name:"阿曼尼·卡帕塔", rank:"中士", unit:"步兵", cn:"已出", win:"常驻"},
+  {id:"antti", name:"安蒂·普卡斯", rank:"中士", unit:"步兵", cn:"已出", win:"常驻"},
+  {id:"torsten", name:"托尔斯滕·比约尔森", rank:"中士", unit:"重机枪手", cn:"已出", win:"常驻"},
+  {id:"bruce", name:"布玛鲁·布鲁斯", rank:"中士", unit:"重机枪手", cn:"已出", win:"常驻"},
+  {id:"emily", name:"艾米莉·穆卡", rank:"中士", unit:"火箭炮手", cn:"已出", win:"常驻"},
+  {id:"sayo", name:"纱世·忍", rank:"中士", unit:"火箭炮手", cn:"已出", win:"常驻"},
+  {id:"julia", name:"茱莉亚·维斯", rank:"中士", unit:"火箭炮手", cn:"已出", win:"常驻"},
+  {id:"koa", name:"寇阿", rank:"中士", unit:"土著勇士", cn:"已出", win:"常驻"},
+  {id:"spawn26", name:"26 号集结点", rank:"中士", unit:"坦克", cn:"已出", win:"常驻"},
+  {id:"kaimana", name:"凯马纳", rank:"中士", unit:"医师", cn:"已出", win:"常驻"},
+  {id:"firecrab", name:"63 号试制喷火蟹", rank:"中士", unit:"烈焰战车", cn:"已出", win:"常驻"},
+  {id:"freja", name:"弗莱娅·里德高", rank:"中士", unit:"激光突击兵", cn:"已出", win:"常驻"},
+  {id:"guardia", name:"亚历山卓·瓜迪亚", rank:"中士", unit:"迫击炮手", cn:"已出", win:"常驻"},
+  {id:"giuseppe", name:"朱塞佩·夏古拉", rank:"中士", unit:"迫击炮手", cn:"已出", win:"常驻"},
+  {id:"hv002", name:"002 型智能机枪手", rank:"赛博中士", unit:"重机枪手", cn:"已出", win:"常驻"},
+  {id:"zk003", name:"003 型智能炮手", rank:"赛博中士", unit:"火箭炮手", cn:"已出", win:"常驻"},
+  {id:"tn005", name:"005 型坦克领袖", rank:"赛博中士", unit:"坦克", cn:"已出", win:"常驻"},
+  {id:"gr007", name:"007 型智能投弹兵", rank:"赛博中士", unit:"投弹兵", cn:"已出", win:"常驻"},
+  {id:"cr010", name:"010 型智能先锋", rank:"赛博中士", unit:"极冻先锋", cn:"已出", win:"常驻"},
+  {id:"bm011", name:"011 型迫击炮队长", rank:"赛博中士", unit:"迫击炮手", cn:"已出", win:"常驻"},
+  {id:"mc012", name:"012 型机甲领袖", rank:"赛博中士", unit:"机甲", cn:"已出", win:"常驻"},
+  {id:"rc013", name:"013 型火箭无人机", rank:"赛博中士", unit:"火箭直升机", cn:"已出", win:"常驻"}
+];
+
+/* 精英池「歪」池：抽金时 50% 非当期，会从这 5 个基础中尉里随机（各 20%） */
+var BASE_MID = [
+  {id:"honu", name:"霍努", unit:"步兵"},
+  {id:"mass", name:"朱利叶斯·马斯", unit:"重机枪手"},
+  {id:"falcao", name:"罗伯托·法尔考", unit:"火箭炮手"},
+  {id:"nafanoua", name:"纳凡菈女皇", unit:"土著勇士"},
+  {id:"tl40", name:"40 式末日彩云", unit:"坦克"}
+];
+
+/* ============ 节日表（2026~2029 常用大节） ============ */
+var FESTIVALS = {
+  "2026-01-01":"元旦","2026-02-14":"情人节","2026-02-16":"除夕","2026-02-17":"春节",
+  "2026-03-03":"元宵节","2026-03-08":"妇女节","2026-04-05":"清明节","2026-05-01":"劳动节",
+  "2026-06-01":"儿童节","2026-06-19":"端午节","2026-09-10":"教师节","2026-09-25":"中秋节",
+  "2026-10-01":"国庆节","2026-12-25":"圣诞节",
+  "2027-01-01":"元旦","2027-02-05":"除夕","2027-02-06":"春节","2027-02-14":"情人节",
+  "2027-02-20":"元宵节","2027-03-08":"妇女节","2027-04-05":"清明节","2027-05-01":"劳动节",
+  "2027-06-01":"儿童节","2027-06-09":"端午节","2027-09-10":"教师节","2027-09-15":"中秋节",
+  "2027-10-01":"国庆节","2027-12-25":"圣诞节",
+  "2028-01-01":"元旦","2028-01-25":"除夕","2028-01-26":"春节","2028-02-09":"元宵节",
+  "2028-02-14":"情人节","2028-03-08":"妇女节","2028-04-04":"清明节","2028-05-01":"劳动节",
+  "2028-05-28":"端午节","2028-06-01":"儿童节","2028-09-10":"教师节","2028-10-01":"国庆节",
+  "2028-10-03":"中秋节","2028-12-25":"圣诞节",
+  "2029-01-01":"元旦","2029-02-12":"除夕","2029-02-13":"春节","2029-02-14":"情人节",
+  "2029-02-27":"元宵节","2029-03-08":"妇女节","2029-04-04":"清明节","2029-05-01":"劳动节",
+  "2029-06-01":"儿童节","2029-06-16":"端午节","2029-09-10":"教师节","2029-09-22":"中秋节",
+  "2029-10-01":"国庆节","2029-12-25":"圣诞节"
+};
+function festivalOf(d){
+  var k = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  return FESTIVALS[k] || "";
+}
+function festivalOfStr(s){
+  if (!s) return "";
+  var d = new Date(s + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  return festivalOf(d);
+}
+
+/* 默认计划：11 月抽 0 命冰妹 -> 明年 4 月抽 1 命安娜 */
+var stages = [
+  { date:"2026-11-02", leader:"nwunu", stars:0, state:"0.5" },
+  { date:"2027-04-29", leader:"anna", stars:1, state:"0.5" }
+];
+
+function pad(n){ return n < 10 ? "0" + n : "" + n; }
+function fmt(n){ return Math.round(n).toLocaleString("zh-CN"); }
+function todayStr(){
+  var d = new Date();
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+function daysFromToday(dateStr){
+  var t = new Date(); t.setHours(0,0,0,0);
+  var d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return null;
+  return Math.round((d - t) / DAYS_MS);
+}
+
+/* ===== 概率核心 ===== */
+function solveHitRate(meanGold, pity){
+  var lo = 1e-5, hi = 0.5, mid;
+  for (var i = 0; i < 80; i++){
+    mid = (lo + hi) / 2;
+    var mean = (1 - Math.pow(1 - mid, pity)) / mid;
+    if (mean > meanGold) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+function drawsForGold(p, pity){
+  for (var n = 1; n <= pity; n++){ if (Math.random() < p) return n; }
+  return pity;
+}
+/* 抽一个当期本体；firstGuaranteed=true 表示下一个金必是当期（已垫 1 金） */
+function drawsForFeatured(p, pity, firstGuaranteed){
+  var d = drawsForGold(p, pity);
+  if (firstGuaranteed) return d;
+  return Math.random() < 0.5 ? d : d + drawsForGold(p, pity);
+}
+function quantile(sorted, x){ return sorted[Math.min(sorted.length - 1, Math.floor(x * sorted.length))]; }
+
+function readCfg(){
+  var weekly = Math.max(0, parseFloat($("weekly").value) || 0);
+  var weeklyDays = Math.max(1, parseFloat($("weeklyDays").value) || 6);
+  var monthly = Math.max(0, parseFloat($("monthly").value) || 0);
+  var sonar = $("sonarOn").checked ? Math.max(0, parseFloat($("sonar").value) || 0) : 0;
+  var free = $("freeOn").checked ? 1 : 0;
+  var daily = weekly / weeklyDays + monthly / 30 + sonar + free;
+  var perUnit = Math.max(60, parseFloat($("perUnit").value) || 120);
+  return {
+    keys: Math.max(0, parseFloat($("keys").value) || 0),
+    daily: daily,
+    perUnit: perUnit,
+    scale: perUnit / 90,
+    parts: {
+      weekly: weekly / weeklyDays,
+      monthly: monthly / 30,
+      sonar: sonar,
+      free: free
+    }
+  };
+}
+function updateDailyCalc(){
+  var cfg = readCfg();
+  var p = cfg.parts;
+  $("dailyCalc").textContent = cfg.daily.toFixed(2) + " 抽/天（周卡 " + p.weekly.toFixed(2) +
+    " + 部署 " + p.monthly.toFixed(2) + " + 声纳 " + p.sonar.toFixed(2) + " + 免费 " + p.free.toFixed(2) + "）";
+}
+
+function readStages(){
+  var rows = document.querySelectorAll("#planBody tr");
+  var out = [];
+  rows.forEach(function(tr){
+    var date = tr.querySelector(".st-date").value.trim();
+    var leader = tr.querySelector(".st-leader").value;
+    var stars = Math.min(5, Math.max(0, parseInt(tr.querySelector(".st-stars").value, 10) || 0));
+    var state = tr.querySelector(".st-state").value;
+    out.push({ date: date, leader: leader, stars: stars, state: state,
+               bodies: stars + 1, days: daysFromToday(date) });
+  });
+  return out;
+}
+
+/* ===== 多阶段模拟 ===== */
+function simulatePlan(cfg, stageList, runs){
+  var p = solveHitRate(60, 80), pity = 80;
+  var scale = cfg.scale || 1;
+  /* 过去的日期不再丢弃，按「现在」处理（days 钳到 0） */
+  var valid = stageList.filter(function(s){ return s.days !== null; })
+    .map(function(s){
+      return { date: s.date, leader: s.leader, stars: s.stars, state: s.state,
+               bodies: s.bodies, days: Math.max(0, s.days) };
+    })
+    .sort(function(a, b){ return a.days - b.days; });
+  if (!valid.length) return null;
+
+  var n = valid.length;
+  var okCount = new Array(n).fill(0);
+  var costSum = new Array(n).fill(0);
+  var poolSamples = [];
+  for (var k = 0; k < n; k++) poolSamples.push(new Float64Array(runs));
+  var leftSamples = new Float64Array(runs);
+  var allOk = 0;
+
+  for (var r = 0; r < runs; r++){
+    var pool = cfg.keys;
+    var prevDays = 0;
+    var stageOk = true;
+    for (var i = 0; i < n; i++){
+      var st = valid[i];
+      pool += cfg.daily * (st.days - prevDays);
+      poolSamples[i][r] = pool;
+      var need = 0;
+      var guaranteed = (st.state === "1.0");
+      var reached = true;
+      for (var b = 0; b < st.bodies; b++){
+        var c = drawsForFeatured(p, pity, guaranteed) * scale;
+        need += c;
+        guaranteed = false;  // 抽中一次后回到首金 50%
+        if (need > pool){ reached = false; break; }
+      }
+      if (reached && need <= pool){
+        pool -= need;
+        okCount[i]++;
+        costSum[i] += need;
+      } else {
+        pool = 0;
+        stageOk = false;
+      }
+      prevDays = st.days;
+    }
+    leftSamples[r] = pool;
+    if (stageOk) allOk++;
+  }
+
+  var lefts = Array.prototype.slice.call(leftSamples).sort(function(a,b){ return a - b; });
+  var details = valid.map(function(st, i){
+    var ps = Array.prototype.slice.call(poolSamples[i]).sort(function(a,b){ return a - b; });
+    return {
+      stage: st,
+      rate: okCount[i] / runs,
+      meanCost: okCount[i] ? costSum[i] / okCount[i] : 0,
+      poolP50: quantile(ps, 0.5)
+    };
+  });
+  return { stages: details, allOk: allOk / runs, leftP50: quantile(lefts, 0.5), leftMemo: lefts };
+}
+
+/* ===== 渲染计划表 ===== */
+function leaderOptions(sel){
+  return LEADERS.map(function(l){
+    return "<option value='" + l.id + "'" + (l.id === sel ? " selected" : "") + ">" +
+      l.name + "（" + l.rank + "·" + l.unit + "·" + l.cn + "）</option>";
+  }).join("");
+}
+function renderPlan(){
+  var body = $("planBody");
+  body.innerHTML = "";
+  stages.forEach(function(st, idx){
+    var tr = document.createElement("tr");
+    tr.className = "stage-row";
+    tr.innerHTML =
+      "<td class='c'>" + (idx + 1) + "</td>" +
+      "<td><input type='text' class='st-date' value='" + st.date + "' placeholder='2026-11-02'> <span class='fest-tag'></span></td>" +
+      "<td><select class='st-leader'>" + leaderOptions(st.leader) + "</select></td>" +
+      "<td class='c'><input type='number' class='st-stars' min='0' max='5' value='" + st.stars + "' style='width:60px'></td>" +
+      "<td><select class='st-state'>" +
+        "<option value='0.5'" + (st.state === "0.5" ? " selected" : "") + ">首金 50%（从零开始）</option>" +
+        "<option value='1.0'" + (st.state === "1.0" ? " selected" : "") + ">已垫 1 金（下次 100%）</option>" +
+      "</select></td>" +
+      "<td class='c bodies-cell'>" + (st.stars + 1) + " 个</td>" +
+      "<td class='c'><button class='ghost del-btn' style='padding:4px 8px'>删</button></td>";
+    body.appendChild(tr);
+  });
+  body.querySelectorAll(".del-btn").forEach(function(btn, i){
+    btn.addEventListener("click", function(){
+      stages = readStages();
+      stages.splice(i, 1);
+      renderPlan();
+    });
+  });
+  body.querySelectorAll(".st-stars").forEach(function(inp){
+    inp.addEventListener("input", function(){
+      var tr = inp.closest("tr");
+      var v = Math.min(5, Math.max(0, parseInt(inp.value, 10) || 0));
+      tr.querySelector(".bodies-cell").textContent = (v + 1) + " 个";
+    });
+  });
+  body.querySelectorAll(".st-date").forEach(function(inp){
+    inp.addEventListener("input", updateFestTags);
+  });
+  updateFestTags();
+}
+
+/* 每行日期旁的节日提示 */
+function updateFestTags(){
+  document.querySelectorAll("#planBody tr").forEach(function(tr){
+    var inp = tr.querySelector(".st-date");
+    var tag = tr.querySelector(".fest-tag");
+    if (!inp || !tag) return;
+    var f = festivalOfStr(inp.value.trim());
+    tag.textContent = f ? ("🎉 " + f) : "";
+    tag.style.color = "#ffb347";
+    tag.style.fontSize = "11px";
+    tag.style.marginLeft = "4px";
+  });
+}
+
+/* ===== 模拟入口 ===== */
+function run(){
+  var cfg = readCfg();
+  var list = readStages();
+  var bad = list.filter(function(s){ return s.days === null; });
+  if (bad.length){ alert("有阶段日期格式不对，请用 2026-11-02 这种格式"); return; }
+  if (!list.length){ alert("至少加一个阶段"); return; }
+
+  var btn = $("go");
+  btn.disabled = true; btn.textContent = "模拟中…";
+
+  setTimeout(function(){
+    var res = simulatePlan(cfg, list, 30000);
+    if (!res){
+      btn.disabled = false; btn.textContent = "开 始 模 拟";
+      alert("没有有效的阶段，请检查日期格式（例如 2026-11-02）");
+      return;
+    }
+    var all = res.allOk * 100;
+    $("rAll").textContent = all.toFixed(1) + "%";
+    $("rAll").className = "v2 " + (all >= 90 ? "good" : all >= 60 ? "warn" : "bad");
+    $("rBar").style.width = Math.min(100, all) + "%";
+    $("rLeft").textContent = fmt(res.leftP50);
+
+    var worst = res.stages.slice().sort(function(a, b){ return a.rate - b.rate; })[0];
+    $("rRisk").textContent = worst.stage.date + " " + leaderName(worst.stage.leader) +
+      "（" + (worst.rate * 100).toFixed(0) + "%）";
+
+    var v = [];
+    v.push("共 <b>" + res.stages.length + "</b> 个阶段，全流程完成概率 <b>" + all.toFixed(1) + "%</b>。");
+    if (all >= 90) v.push("结论：<b>这套计划稳，可以按这个节奏抽。</b>");
+    else if (all >= 60) v.push("结论：<b>偏乐观，主要看 " + worst.stage.date + " 那一期</b>，必要时减少命数或延后。");
+    else v.push("结论：<b>大概率完不成</b>，主要是 " + worst.stage.date + " 那期抽数不够，建议砍目标或加预算。");
+    v.push("全部完成后的剩余抽数中位数：<b>" + fmt(res.leftP50) + "</b>。");
+    v.push("每期抽金：<b>50%</b> 本期主打，<b>50%</b> 歪到基础中尉（霍努 / 马斯 / 法尔考 / 纳凡菈 / 40 式，各 20%）——歪到的也算收获，只是不是目标。");
+    $("verdict").innerHTML = v.join("<br>");
+
+    var rows = "<tr><th>#</th><th>日期</th><th>目标</th><th>命数</th><th>池状态</th><th>需要本体</th><th>届时抽数</th><th>期望消耗</th><th>达成率</th></tr>";
+    res.stages.forEach(function(d, i){
+      var st = d.stage;
+      var rc = d.rate * 100;
+      var cls = rc >= 90 ? "good" : rc >= 60 ? "warn" : "bad";
+      rows += "<tr><td class='c'>" + (i + 1) + "</td><td>" + st.date + "</td><td>" +
+        leaderName(st.leader) + "</td><td class='c'>" + st.stars + " 命</td><td class='c'>" +
+        (st.state === "1.0" ? "已垫 1 金" : "首金 50%") + "</td><td class='c'>" + st.bodies +
+        "</td><td class='c'>" + fmt(d.poolP50) + "</td><td class='c'>" + fmt(d.meanCost) +
+        "</td><td class='c " + cls + "'>" + rc.toFixed(1) + "%</td></tr>";
+    });
+    $("stageResult").innerHTML = rows;
+
+    $("result").style.display = "block";
+    btn.disabled = false; btn.textContent = "再 模 拟 一 次";
+  }, 30);
+}
+
+function leaderName(id){
+  for (var i = 0; i < LEADERS.length; i++) if (LEADERS[i].id === id) return LEADERS[i].name;
+  return id;
+}
+
+/* ===== 精英中尉总览 / 歪池名单 ===== */
+function renderEliteList(){
+  var el = LEADERS.filter(function(l){ return l.rank === "精英中尉"; });
+  var rows = "<tr><th>队长</th><th>状态</th><th>卡池起止</th></tr>";
+  el.forEach(function(l){
+    var cls = l.cn === "已出" ? "good" : "warn";
+    rows += "<tr><td>" + l.name + "</td><td class='" + cls + "'>" + l.cn + "</td><td>" + l.win + "</td></tr>";
+  });
+  $("eliteTable").innerHTML = rows;
+}
+function renderMidList(){
+  var rows = "<tr><th>队长</th><th>兵种</th><th>歪到时概率</th></tr>";
+  BASE_MID.forEach(function(m){
+    rows += "<tr><td>" + m.name + "</td><td>" + m.unit + "</td><td class='c'>20%</td></tr>";
+  });
+  $("midTable").innerHTML = rows;
+}
+function renderFestList(){
+  var years = ["2026", "2027", "2028", "2029"];
+  var rows = "<tr><th style='width:70px'>年份</th><th>节日（月-日）</th></tr>";
+  years.forEach(function(y){
+    var items = [];
+    for (var k in FESTIVALS){
+      if (k.indexOf(y + "-") === 0) items.push(FESTIVALS[k] + " " + k.slice(5));
+    }
+    rows += "<tr><td>" + y + "</td><td style='line-height:1.9'>" + items.join("　·　") + "</td></tr>";
+  });
+  $("festTable").innerHTML = rows;
+}
+
+$("addStage").addEventListener("click", function(){
+  stages = readStages();
+  var last = stages[stages.length - 1];
+  stages.push({
+    date: last ? last.date : todayStr(),
+    leader: "anna",
+    stars: 0,
+    state: "0.5"
+  });
+  renderPlan();
+});
+$("go").addEventListener("click", run);
+["keys", "weekly", "weeklyDays", "monthly", "sonar", "sonarOn", "freeOn", "perUnit"].forEach(function(id){
+  $(id).addEventListener("input", updateDailyCalc);
+  $(id).addEventListener("change", updateDailyCalc);
+});
+renderEliteList();
+renderMidList();
+renderFestList();
+renderPlan();
+updateDailyCalc();
+</script>
+</body>
+</html>
